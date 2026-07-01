@@ -105,6 +105,9 @@ def round_can_advance(conn: sqlite3.Connection) -> tuple[bool, str]:
     open_matches = [match for match in matches if match.status != MatchStatus.COMPLETE]
     if open_matches:
         return False, f"Faltan cerrar {len(open_matches)} partido(s)."
+    winners = [match.winner_id for match in matches if match.winner_id is not None]
+    if len(winners) == 1:
+        return True, "La final esta cerrada. Ya se puede coronar campeon."
     pending_reps = current_losers_without_rep(conn)
     if pending_reps:
         return False, f"Faltan {len(pending_reps)} representante(s)."

@@ -13,20 +13,18 @@ def apply_theme() -> None:
         """
         <style>
         :root {
-            --pitch: #116149;
-            --pitch-dark: #0b493a;
             --chalk: #fffaf0;
-            --paper: #fffdf7;
-            --ink: #14231f;
-            --muted: #60736c;
-            --signal: #f6d84f;
-            --blue: #2457c5;
-            --rose: #c84667;
-            --line: rgba(20, 35, 31, 0.16);
+            --ink: #0f1419;
+            --muted: #5f6770;
+            --blue: #385da8;
+            --blue-soft: #d7defd;
+            --tab: #f3f0ee;
+            --card: #f2f2f2;
+            --line: rgba(15, 20, 25, 0.13);
         }
 
         .stApp {
-            background: #f5f5f5;
+            background: #ffffff;
             color: var(--ink);
         }
 
@@ -36,15 +34,18 @@ def apply_theme() -> None:
             display: none;
         }
 
+        .print-button {
+            display: none !important;
+        }
+
         .block-container {
-            max-width: 1180px;
-            margin-top: 1.25rem;
-            margin-bottom: 2rem;
-            padding: 2rem 2rem 3rem;
+            max-width: none;
+            margin: 0;
+            padding: 0 0 3rem;
             background: #ffffff;
-            border: 1px solid rgba(20, 35, 31, 0.14);
-            border-radius: 8px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            border: 0;
+            border-radius: 0;
+            box-shadow: none;
         }
 
         section.main > div {
@@ -69,7 +70,7 @@ def apply_theme() -> None:
         }
 
         [data-testid="stSidebar"] {
-            background: var(--chalk);
+            background: #ffffff;
             border-right: 1px solid var(--line);
         }
 
@@ -89,25 +90,97 @@ def apply_theme() -> None:
         }
 
         .stTabs [data-baseweb="tab-list"] {
-            gap: 10px;
-            background: transparent;
-            border: 0;
+            justify-content: center;
+            gap: 12px;
+            background: #ffffff;
+            border-bottom: 1px solid #e1e1e1;
             border-radius: 0;
-            padding: 8px 0 14px;
+            padding: 24px 16px;
         }
 
         .stTabs [data-baseweb="tab"] {
-            background: #f3efec;
-            border-radius: 10px;
+            background: var(--tab);
+            border-radius: 11px;
             color: var(--ink);
             font-weight: 800;
-            padding: 12px 18px;
+            min-width: 124px;
+            padding: 14px 20px;
         }
 
         .stTabs [aria-selected="true"] {
-            background: #dbe3ff;
-            color: #263da8;
-            box-shadow: inset 0 -4px 0 #4057c8;
+            background: var(--blue-soft);
+            color: #2447a8;
+            box-shadow: inset 0 -4px 0 #3953c6;
+        }
+
+        .event-header {
+            height: 102px;
+            background:
+                linear-gradient(126deg, rgba(255,255,255,0.26) 72%, rgba(255,255,255,0.0) 72%),
+                linear-gradient(115deg, #315f95 0%, #3a6da2 50%, #9db6ce 100%);
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            padding: 0 42px;
+        }
+
+        .event-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            min-width: 0;
+        }
+
+        .event-back {
+            font-size: 2.4rem;
+            line-height: 1;
+            font-weight: 300;
+            opacity: 0.95;
+        }
+
+        .event-logo {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background:
+                radial-gradient(circle at 64% 35%, #ffffff 0 16%, transparent 17%),
+                conic-gradient(from 30deg, #f05a28, #ffffff, #2786c7, #39a64a, #f6c641, #ffffff, #f05a28);
+            box-shadow: inset 0 0 0 5px rgba(255,255,255,.88), 0 5px 16px rgba(0,0,0,.18);
+            flex: 0 0 auto;
+        }
+
+        .event-copy {
+            min-width: 0;
+        }
+
+        .event-title {
+            margin: 0;
+            color: #ffffff;
+            font-size: 1.55rem;
+            line-height: 1.05;
+            font-weight: 900;
+            white-space: nowrap;
+        }
+
+        .event-date {
+            margin: 10px 0 0;
+            color: #ffffff;
+            font-size: 1.05rem;
+            font-weight: 700;
+        }
+
+        div[data-testid="stVerticalBlock"] > div:has(.fixture-strip),
+        div[data-testid="stVerticalBlock"] > div:has(.metric-tile),
+        div[data-testid="stVerticalBlock"] > div:has(.match-card),
+        div[data-testid="stVerticalBlock"] > div:has(.team-list),
+        div[data-testid="stVerticalBlock"] > div:has(div[data-testid="stForm"]),
+        div[data-testid="stVerticalBlock"] > div:has(div[data-testid="stAlert"]) {
+            max-width: 1180px;
+            margin-left: auto;
+            margin-right: auto;
+            padding-left: 24px;
+            padding-right: 24px;
         }
 
         div[data-testid="stForm"],
@@ -313,23 +386,23 @@ def apply_theme() -> None:
             overflow-x: auto;
             overflow-y: hidden;
             background: #ffffff;
-            border: 1px solid rgba(20, 35, 31, 0.10);
-            border-radius: 8px;
-            padding: 0 0 24px;
-            margin: 8px 0 22px;
-            box-shadow: 0 14px 34px rgba(0, 0, 0, 0.08);
+            border: 0;
+            border-radius: 0;
+            padding: 0 0 34px;
+            margin: 0 0 18px;
+            box-shadow: none;
         }
 
         .march-board {
             display: flex;
             align-items: stretch;
-            gap: 28px;
+            gap: 30px;
             min-width: max-content;
-            padding: 0 24px 10px;
+            padding: 0 0 12px;
         }
 
         .march-column {
-            width: 240px;
+            width: 254px;
             display: flex;
             flex-direction: column;
         }
@@ -338,13 +411,13 @@ def apply_theme() -> None:
             position: sticky;
             top: 0;
             z-index: 2;
-            margin: 0 -24px 28px 0;
-            padding: 18px 0 16px;
+            margin: 0 0 44px;
+            padding: 10px 0 20px;
             background: #ffffff;
-            border-bottom: 1px solid #e8e3df;
+            border-bottom: 0;
             color: #050505;
-            font-size: 1rem;
-            font-weight: 850;
+            font-size: 1.08rem;
+            font-weight: 700;
             text-align: center;
         }
 
@@ -352,28 +425,28 @@ def apply_theme() -> None:
             display: flex;
             flex-direction: column;
             justify-content: space-around;
-            gap: 18px;
+            gap: 30px;
             height: 100%;
-            min-height: 650px;
+            min-height: 760px;
         }
 
         .march-match {
             position: relative;
-            background: #f1f1f1;
-            border-radius: 22px;
-            padding: 14px 16px 12px;
-            min-height: 132px;
+            background: var(--card);
+            border-radius: 24px;
+            padding: 14px 18px 12px;
+            min-height: 150px;
             box-shadow: none;
         }
 
         .march-match::after {
             content: "";
             position: absolute;
-            right: -29px;
+            right: -31px;
             top: 50%;
-            width: 29px;
+            width: 31px;
             height: 1px;
-            background: #c9c9c9;
+            background: #bfc4c9;
         }
 
         .right-side .march-match::after {
@@ -392,18 +465,31 @@ def apply_theme() -> None:
             justify-content: space-between;
             gap: 12px;
             color: #4f5961;
-            font-size: 0.82rem;
-            margin-bottom: 10px;
+            font-size: 0.9rem;
+            margin-bottom: 12px;
         }
 
         .march-player {
             display: flex;
             align-items: center;
-            min-height: 34px;
-            padding: 5px 0;
+            min-height: 38px;
+            padding: 6px 0;
             color: #050505;
-            font-size: 1rem;
+            font-size: 1.1rem;
             font-weight: 650;
+        }
+
+        .march-player::before {
+            content: "";
+            width: 22px;
+            height: 16px;
+            margin-right: 12px;
+            border-radius: 2px;
+            background:
+                linear-gradient(90deg, #dde1e5 0 32%, transparent 32%),
+                linear-gradient(#f8f8f8 0 33%, #315f95 33% 66%, #f8f8f8 66%);
+            box-shadow: 0 0 0 1px rgba(0,0,0,.08);
+            flex: 0 0 auto;
         }
 
         .march-player span {
@@ -417,18 +503,25 @@ def apply_theme() -> None:
         }
 
         .march-player.winner-slot::before {
-            content: "";
-            width: 4px;
-            height: 22px;
-            margin-right: 8px;
-            border-radius: 999px;
-            background: #4057c8;
+            width: 22px;
+            height: 16px;
+            margin-right: 12px;
+            border-radius: 2px;
+            background:
+                linear-gradient(90deg, #dde1e5 0 32%, transparent 32%),
+                linear-gradient(#ffffff 0 33%, #4057c8 33% 66%, #ffffff 66%);
         }
 
         .march-line {
             height: 1px;
-            margin-top: 6px;
+            margin-top: 8px;
             background: #d7d7d7;
+        }
+
+        .march-footer {
+            color: #59616a;
+            font-size: 0.9rem;
+            margin-top: 10px;
         }
 
         .march-line.is-complete {
@@ -473,12 +566,35 @@ def apply_theme() -> None:
 
         @media (max-width: 720px) {
             .block-container {
-                margin-top: 1.25rem;
-                margin-bottom: 0;
-                padding: 1rem 1rem 2rem;
-                border-radius: 0;
-                border-left: 0;
-                border-right: 0;
+                padding: 0 0 2rem;
+            }
+            .event-header {
+                height: 94px;
+                padding: 0 16px;
+            }
+            .event-back {
+                display: none;
+            }
+            .event-logo {
+                width: 52px;
+                height: 52px;
+            }
+            .event-title {
+                font-size: 1.12rem;
+                white-space: normal;
+            }
+            .event-date {
+                font-size: 0.92rem;
+                margin-top: 6px;
+            }
+            .stTabs [data-baseweb="tab-list"] {
+                justify-content: flex-start;
+                overflow-x: auto;
+                padding: 18px 12px;
+            }
+            .stTabs [data-baseweb="tab"] {
+                min-width: 104px;
+                padding: 12px 14px;
             }
             .fixture-strip {
                 padding: 16px 14px 18px;
@@ -502,22 +618,38 @@ def apply_theme() -> None:
             }
             .march-shell {
                 border-radius: 0;
-                margin-left: -1rem;
-                margin-right: -1rem;
+                margin-left: 0;
+                margin-right: 0;
             }
             .march-board {
-                gap: 22px;
-                padding-left: 16px;
-                padding-right: 16px;
+                gap: 24px;
             }
             .march-column {
-                width: 220px;
+                width: 230px;
             }
             .march-stack {
-                min-height: 560px;
+                min-height: 650px;
             }
         }
         </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def event_header() -> None:
+    st.markdown(
+        """
+        <div class="event-header">
+            <div class="event-left">
+                <div class="event-back">&#8249;</div>
+                <div class="event-logo" aria-hidden="true"></div>
+                <div class="event-copy">
+                    <p class="event-title">Cumple Mundial FC</p>
+                    <p class="event-date">Torneo de cumpleanos</p>
+                </div>
+            </div>
+        </div>
         """,
         unsafe_allow_html=True,
     )

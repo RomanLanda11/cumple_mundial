@@ -20,15 +20,17 @@ from src.tournament import (
     current_losers_without_rep,
     name_for,
     player_name_map,
+    representative_lookup,
+    resolve_representative,
     round_can_advance,
     round_label,
     start_tournament,
     teams_by_alive_player,
 )
-from src.ui import apply_theme, hero, metric_tile, render_match_card
+from src.ui import apply_theme, event_header, hero, metric_tile, render_match_card
 
 
-st.set_page_config(page_title="Cumple Mundial", layout="wide")
+st.set_page_config(page_title="Cumple Mundial", layout="wide", initial_sidebar_state="collapsed")
 
 
 def get_connection() -> sqlite3.Connection:
@@ -39,6 +41,16 @@ def get_connection() -> sqlite3.Connection:
 
 def rerun() -> None:
     st.rerun()
+
+
+def reset_panel(conn: sqlite3.Connection, location: str = "main") -> None:
+    with st.expander("Administracion"):
+        st.caption("Reinicio total del torneo.")
+        confirm = st.text_input("Escribi REINICIAR para borrar todo", key=f"{location}-reset-confirm")
+        if st.button("Reiniciar torneo", disabled=confirm != "REINICIAR", use_container_width=True, key=f"{location}-reset-button"):
+            db.reset_db(conn)
+            st.success("Torneo reiniciado")
+            rerun()
 
 
 def registration_view(conn: sqlite3.Connection) -> None:
@@ -107,7 +119,7 @@ def registration_view(conn: sqlite3.Connection) -> None:
                 rerun()
 
 
-def result_form(conn: sqlite3.Connection, match_id: int, names: dict[int, str]) -> None:
+def result_form(conn: sqlite3.Connection, match_id: int, names: dict[int, str], key_prefix: str = "result") -> None:
     matches = {match.id: match for match in db.list_matches(conn)}
     match = matches[match_id]
     candidates = [pid for pid in (match.player_a_id, match.player_b_id) if pid is not None]
@@ -115,7 +127,7 @@ def result_form(conn: sqlite3.Connection, match_id: int, names: dict[int, str]) 
         return
 
     labels = {name_for(names, pid): pid for pid in candidates}
-    with st.form(f"result-{match.id}"):
+    with st.form(f"{key_prefix}-result-{match.id}"):
         winner_label = st.radio("Quien gano?", list(labels.keys()), horizontal=True)
         note = st.text_input("Juego o nota", placeholder="Ej: penales, truco, ping pong")
         pledge_done = st.checkbox("Hizo medio fondo blanco", value=False)
@@ -129,8 +141,10 @@ def result_form(conn: sqlite3.Connection, match_id: int, names: dict[int, str]) 
 
 
 def representatives_panel(conn: sqlite3.Connection, names: dict[int, str], key_prefix: str = "representatives") -> None:
-    if sort_items is not None:
-        render_representatives_drag(conn, names, key_prefix)
+    state = db.get_state(conn)
+    matches = db.list_matches(conn, state.current_round)
+    if len(matches) == 1 and matches[0].status == MatchStatus.COMPLETE:
+        st.success("Final cerrada. No hace falta asignar representante: el campeon conserva su bando.")
         return
 
     pending = current_losers_without_rep(conn)
@@ -138,12 +152,12 @@ def representatives_panel(conn: sqlite3.Connection, names: dict[int, str], key_p
         st.success("Todos los eliminados de esta ronda ya tienen representante.")
         return
 
-    alive_ids = sorted({match.winner_id for match in db.list_matches(conn, db.get_state(conn).current_round) if match.winner_id})
+    alive_ids = sorted({match.winner_id for match in db.list_matches(conn, state.current_round) if match.winner_id})
     alive_labels = {name_for(names, pid): pid for pid in alive_ids}
     st.warning(f"Faltan {len(pending)} representante(s).")
     for match in pending:
         loser_name = name_for(names, match.loser_id)
-        with st.form(f"rep-{match.id}"):
+        with st.form(f"{key_prefix}-rep-{match.id}"):
             selected = st.selectbox(f"Representante de {loser_name}", list(alive_labels.keys()))
             submitted = st.form_submit_button("Guardar representante", use_container_width=True)
         if submitted:
@@ -153,66 +167,6 @@ def representatives_panel(conn: sqlite3.Connection, names: dict[int, str], key_p
                 rerun()
             except ValueError as exc:
                 st.error(str(exc))
-
-
-def render_representatives_drag(conn: sqlite3.Connection, names: dict[int, str], key_prefix: str) -> None:
-    pending = current_losers_without_rep(conn)
-    if not pending:
-        st.success("Todos los eliminados de esta ronda ya tienen representante.")
-        return
-
-    state = db.get_state(conn)
-    alive_ids = sorted({match.winner_id for match in db.list_matches(conn, state.current_round) if match.winner_id})
-    if not alive_ids:
-        st.info("Primero cerra algun partido para que aparezcan bandos disponibles.")
-        return
-
-    pending_by_name = {
-        name_for(names, match.loser_id): (match.loser_id, match.id)
-        for match in pending
-        if match.loser_id is not None
-    }
-    leader_by_header = {name_for(names, player_id): player_id for player_id in alive_ids}
-    containers = [{"header": "Sin bando", "items": list(pending_by_name.keys())}]
-    containers.extend({"header": leader_name, "items": []} for leader_name in leader_by_header)
-
-    st.caption("Arrastra cada eliminado al bando del jugador que eligio como representante.")
-    sorted_containers = sort_items(
-        containers,
-        multi_containers=True,
-        direction="horizontal",
-        key=f"{key_prefix}-bands-round-{state.current_round}-{len(pending)}",
-        custom_style=drag_style(),
-    )
-
-    if st.button("Guardar bandos", type="primary", use_container_width=True, key=f"{key_prefix}-save-bands"):
-        try:
-            save_drag_representatives(conn, sorted_containers, pending_by_name, leader_by_header)
-            st.toast("Bandos actualizados")
-            rerun()
-        except ValueError as exc:
-            st.error(str(exc))
-
-
-def save_drag_representatives(
-    conn: sqlite3.Connection,
-    sorted_containers: list[dict[str, list[str]]],
-    pending_by_name: dict[str, tuple[int, int]],
-    leader_by_header: dict[str, int],
-) -> None:
-    assigned: set[str] = set()
-    for container in sorted_containers:
-        leader_id = leader_by_header.get(container["header"])
-        if leader_id is None:
-            continue
-        for loser_name in container["items"]:
-            if loser_name not in pending_by_name:
-                raise ValueError("Movimiento invalido: ese jugador no esta pendiente de bando.")
-            if loser_name in assigned:
-                raise ValueError("Un eliminado no puede estar en dos bandos.")
-            loser_id, match_id = pending_by_name[loser_name]
-            assign_representative(conn, loser_id, leader_id, match_id)
-            assigned.add(loser_name)
 
 
 def drag_style() -> str:
@@ -231,16 +185,12 @@ def current_round_view(conn: sqlite3.Connection) -> None:
     matches = db.list_matches(conn, state.current_round)
     can_advance, reason = round_can_advance(conn)
 
-    hero(
-        round_label(state.current_round, state.bracket_size),
-        "Carga resultados, asigna representantes y avanza cuando la ronda este cerrada.",
-    )
-
-    tab_board, tab_control, tab_teams = st.tabs(["Tablero", "Control de ronda", "Bandos"])
+    tab_board, tab_control, tab_teams = st.tabs(["Cuadro", "Partidos", "Bandos"])
 
     with tab_board:
         render_bracket(conn, names)
-        render_drag_advancement(conn, names)
+        render_final_winner_team_preview(conn, names, matches)
+        render_board_actions(conn, names, matches, can_advance, reason)
 
     with tab_control:
         k1, k2, k3, k4 = st.columns(4)
@@ -257,7 +207,7 @@ def current_round_view(conn: sqlite3.Connection) -> None:
         for match in matches:
             with st.expander(f"Partido {match.position}: {name_for(names, match.player_a_id)} vs {name_for(names, match.player_b_id)}", expanded=match.status == MatchStatus.PENDING):
                 render_match_card(match, names, state.bracket_size)
-                result_form(conn, match.id, names)
+                result_form(conn, match.id, names, "control")
 
         st.markdown("### Representantes")
         representatives_panel(conn, names, "control")
@@ -277,10 +227,62 @@ def current_round_view(conn: sqlite3.Connection) -> None:
             st.button("Avanzar ronda", disabled=True, use_container_width=True)
 
     with tab_teams:
-        if state.status == TournamentStatus.IN_PROGRESS:
-            st.markdown("### Armar bandos")
-            representatives_panel(conn, names, "teams")
         render_teams(conn, names)
+
+
+def render_board_actions(
+    conn: sqlite3.Connection,
+    names: dict[int, str],
+    matches: list[Match],
+    can_advance: bool,
+    reason: str,
+) -> None:
+    state = db.get_state(conn)
+    st.markdown("### Acciones del cuadro")
+    action_tabs = st.tabs(["Ganadores", "Bandos", "Avance"])
+
+    with action_tabs[0]:
+        pending_matches = [
+            match
+            for match in matches
+            if match.status == MatchStatus.PENDING and len(match_players(match)) == 2
+        ]
+        if not pending_matches:
+            st.success("No quedan partidos abiertos para cargar en esta ronda.")
+        else:
+            cols = st.columns(2)
+            for index, match in enumerate(pending_matches):
+                with cols[index % 2]:
+                    result_form(conn, match.id, names, "board")
+
+    with action_tabs[1]:
+        representatives_panel(conn, names, "board")
+
+    with action_tabs[2]:
+        if can_advance:
+            st.success(reason)
+            if st.button("Avanzar ronda", type="primary", use_container_width=True, key="board-advance-round"):
+                try:
+                    advance_round(conn)
+                    st.toast("Ronda avanzada")
+                    rerun()
+                except ValueError as exc:
+                    st.error(str(exc))
+        else:
+            st.info(reason)
+            st.button("Avanzar ronda", disabled=True, use_container_width=True, key="board-advance-round-disabled")
+
+        if state.current_round < max(1, state.bracket_size.bit_length() - 1):
+            render_drag_advancement(conn, names)
+
+
+def render_final_winner_team_preview(conn: sqlite3.Connection, names: dict[int, str], matches: list[Match]) -> None:
+    if len(matches) != 1:
+        return
+    final_match = matches[0]
+    if final_match.status != MatchStatus.COMPLETE or final_match.winner_id is None:
+        return
+    render_team_for_leader(conn, names, final_match.winner_id, "Bando ganador")
 
 
 def match_players(match: Match) -> list[int]:
@@ -335,15 +337,18 @@ def render_bracket_match(match: Match, names: dict[int, str], bracket_size: int)
     status_class = "is-complete" if match.status == MatchStatus.COMPLETE else "is-pending"
     a_class = "winner-slot" if match.winner_id and match.winner_id == match.player_a_id else ""
     b_class = "winner-slot" if match.winner_id and match.winner_id == match.player_b_id else ""
+    match_status = "Cerrado" if match.status == MatchStatus.COMPLETE else "Proximamente"
+    match_time = "FT" if match.status == MatchStatus.COMPLETE else "--:--"
     return (
         "<article class='march-match'>"
         "<div class='march-meta'>"
         f"<span>{escape(round_label(match.round_number, bracket_size))} #{match.position}</span>"
-        f"<span>{'Cerrado' if match.status == MatchStatus.COMPLETE else 'Proximamente'}</span>"
+        f"<span>{match_time}</span>"
         "</div>"
         f"<div class='march-player {a_class}'><span>{escape(bracket_player_text(match, names, 'a', bracket_size))}</span></div>"
         f"<div class='march-player {b_class}'><span>{escape(bracket_player_text(match, names, 'b', bracket_size))}</span></div>"
         f"<div class='march-line {status_class}'></div>"
+        f"<div class='march-footer'>{match_status}</div>"
         "</article>"
     )
 
@@ -536,7 +541,25 @@ def final_view(conn: sqlite3.Connection) -> None:
     champion = name_for(names, state.champion_id)
     hero("Campeon definido", f"{champion} gano el Cumple Mundial.")
     st.balloons()
-    render_teams(conn, names)
+    if state.champion_id is not None:
+        render_team_for_leader(conn, names, state.champion_id, "Bando campeon")
+
+
+def render_team_for_leader(conn: sqlite3.Connection, names: dict[int, str], leader_id: int, title: str) -> None:
+    reps = representative_lookup(conn)
+    members = [
+        player
+        for player in db.list_players(conn)
+        if resolve_representative(player.id, reps) == leader_id
+    ]
+    members.sort(key=lambda player: player.name)
+    st.markdown(f"### {title}: {name_for(names, leader_id)}")
+    st.markdown(
+        "<div class='team-list'>"
+        + "".join(f"<div>{member.name}</div>" for member in members)
+        + "</div>",
+        unsafe_allow_html=True,
+    )
 
 
 def sidebar_admin(conn: sqlite3.Connection) -> None:
@@ -558,6 +581,8 @@ def sidebar_admin(conn: sqlite3.Connection) -> None:
 def main() -> None:
     apply_theme()
     conn = get_connection()
+    event_header()
+    reset_panel(conn)
     sidebar_admin(conn)
     state = db.get_state(conn)
 

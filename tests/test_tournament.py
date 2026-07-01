@@ -115,6 +115,50 @@ def test_representation_chain_moves_people_to_final_leader(conn: sqlite3.Connect
     assert match_1.player_b_id in champion_team
 
 
+def test_final_can_close_without_assigning_runner_up_representative(conn: sqlite3.Connection) -> None:
+    add_players(conn, 4)
+    start_tournament(conn, seed=1)
+    match_1, match_2 = db.list_matches(conn, 1)
+    db.update_match_result(conn, match_1.id, match_1.player_a_id, match_1.player_b_id, "", True)
+    db.update_match_result(conn, match_2.id, match_2.player_a_id, match_2.player_b_id, "", True)
+    assign_representative(conn, match_1.player_b_id, match_1.player_a_id, match_1.id)
+    assign_representative(conn, match_2.player_b_id, match_2.player_a_id, match_2.id)
+    advance_round(conn)
+
+    final = db.list_matches(conn, 2)[0]
+    db.update_match_result(conn, final.id, final.player_a_id, final.player_b_id, "", True)
+    can_advance, reason = round_can_advance(conn)
+    advance_round(conn)
+
+    state = db.get_state(conn)
+    assert can_advance is True
+    assert "campeon" in reason
+    assert state.status == TournamentStatus.COMPLETE
+    assert state.champion_id == final.player_a_id
+
+
+def test_reset_db_after_completed_tournament_clears_foreign_keys(conn: sqlite3.Connection) -> None:
+    add_players(conn, 4)
+    start_tournament(conn, seed=1)
+    match_1, match_2 = db.list_matches(conn, 1)
+    db.update_match_result(conn, match_1.id, match_1.player_a_id, match_1.player_b_id, "", True)
+    db.update_match_result(conn, match_2.id, match_2.player_a_id, match_2.player_b_id, "", True)
+    assign_representative(conn, match_1.player_b_id, match_1.player_a_id, match_1.id)
+    assign_representative(conn, match_2.player_b_id, match_2.player_a_id, match_2.id)
+    advance_round(conn)
+    final = db.list_matches(conn, 2)[0]
+    db.update_match_result(conn, final.id, final.player_a_id, final.player_b_id, "", True)
+    advance_round(conn)
+
+    db.reset_db(conn)
+
+    state = db.get_state(conn)
+    assert state.status == TournamentStatus.REGISTRATION
+    assert state.champion_id is None
+    assert db.list_players(conn) == []
+    assert db.list_matches(conn) == []
+
+
 def test_round_labels_use_march_madness_names() -> None:
     assert round_label(1, 64) == "Round of 64"
     assert round_label(2, 64) == "Round of 32"

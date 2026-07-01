@@ -74,17 +74,23 @@ def init_db(conn: sqlite3.Connection) -> None:
 
 
 def reset_db(conn: sqlite3.Connection) -> None:
-    conn.executescript(
-        """
-        DELETE FROM representations;
-        DELETE FROM matches;
-        DELETE FROM players;
-        UPDATE tournament_state
-        SET status = 'registration', current_round = 0, bracket_size = 0, champion_id = NULL
-        WHERE id = 1;
-        """
-    )
     conn.commit()
+    conn.execute("PRAGMA foreign_keys = OFF")
+    try:
+        conn.executescript(
+            """
+            UPDATE tournament_state
+            SET status = 'registration', current_round = 0, bracket_size = 0, champion_id = NULL
+            WHERE id = 1;
+            DELETE FROM representations;
+            DELETE FROM matches;
+            DELETE FROM players;
+            DELETE FROM sqlite_sequence WHERE name IN ('players', 'matches', 'representations');
+            """
+        )
+        conn.commit()
+    finally:
+        conn.execute("PRAGMA foreign_keys = ON")
 
 
 def get_state(conn: sqlite3.Connection) -> TournamentState:
