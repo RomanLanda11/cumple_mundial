@@ -1,0 +1,1 @@
+"""Cumple Mundial tournament app."""
