@@ -48,6 +48,21 @@ def test_start_tournament_uses_next_power_of_two_with_byes(conn: sqlite3.Connect
     assert len(complete_byes) == state.bracket_size - amount
 
 
+def test_six_player_byes_feed_different_semifinals(conn: sqlite3.Connection) -> None:
+    add_players(conn, 6)
+
+    start_tournament(conn, seed=10)
+
+    matches = db.list_matches(conn, 1)
+    bye_matches = [match for match in matches if match.status == MatchStatus.COMPLETE and match.loser_id is None]
+    open_matches = [match for match in matches if match.status == MatchStatus.PENDING]
+    bye_semifinal_positions = {(match.position + 1) // 2 for match in bye_matches}
+
+    assert len(open_matches) == 2
+    assert len(bye_matches) == 2
+    assert bye_semifinal_positions == {1, 2}
+
+
 def test_cannot_advance_with_open_matches(conn: sqlite3.Connection) -> None:
     add_players(conn, 4)
     start_tournament(conn, seed=1)

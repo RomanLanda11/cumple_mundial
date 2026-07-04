@@ -33,17 +33,42 @@ def start_tournament(conn: sqlite3.Connection, *, seed: int | None = None) -> No
     bye_players = shuffled[:bye_count]
     remaining_players = shuffled[bye_count:]
 
-    raw_pairs: list[tuple[int | None, int | None]] = [(player_id, None) for player_id in bye_players]
-    for index in range(0, len(remaining_players), 2):
-        raw_pairs.append((remaining_players[index], remaining_players[index + 1]))
+    first_round_match_count = bracket_size // 2
+    raw_pairs: list[tuple[int | None, int | None] | None] = [None] * first_round_match_count
+
+    groups = [
+        list(range(index, min(index + 2, first_round_match_count)))
+        for index in range(0, first_round_match_count, 2)
+    ]
+    rng.shuffle(groups)
+    for group in groups:
+        rng.shuffle(group)
+
+    bye_positions: list[int] = []
+    for slot_index in range(2):
+        for group in groups:
+            if len(bye_positions) >= bye_count:
+                break
+            if slot_index < len(group):
+                bye_positions.append(group[slot_index])
+
+    for player_id, position in zip(bye_players, bye_positions):
+        raw_pairs[position] = (player_id, None)
+
+    open_positions = [index for index, pair in enumerate(raw_pairs) if pair is None]
+    for pair_index, position in enumerate(open_positions):
+        player_index = pair_index * 2
+        raw_pairs[position] = (remaining_players[player_index], remaining_players[player_index + 1])
 
     randomized_pairs = []
-    for left, right in raw_pairs:
+    for pair in raw_pairs:
+        if pair is None:
+            continue
+        left, right = pair
         if rng.random() < 0.5:
             randomized_pairs.append((left, right))
         else:
             randomized_pairs.append((right, left))
-    rng.shuffle(randomized_pairs)
 
     pairs = []
     for index, (left, right) in enumerate(randomized_pairs):

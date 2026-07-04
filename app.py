@@ -190,7 +190,7 @@ def current_round_view(conn: sqlite3.Connection) -> None:
     with tab_board:
         render_bracket(conn, names)
         render_final_winner_team_preview(conn, names, matches)
-        render_board_actions(conn, names, matches, can_advance, reason)
+        render_board_actions(conn, names, matches)
 
     with tab_control:
         k1, k2, k3, k4 = st.columns(4)
@@ -234,12 +234,9 @@ def render_board_actions(
     conn: sqlite3.Connection,
     names: dict[int, str],
     matches: list[Match],
-    can_advance: bool,
-    reason: str,
 ) -> None:
-    state = db.get_state(conn)
     st.markdown("### Acciones del cuadro")
-    action_tabs = st.tabs(["Ganadores", "Bandos", "Avance"])
+    action_tabs = st.tabs(["Ganadores", "Bandos"])
 
     with action_tabs[0]:
         pending_matches = [
@@ -257,23 +254,6 @@ def render_board_actions(
 
     with action_tabs[1]:
         representatives_panel(conn, names, "board")
-
-    with action_tabs[2]:
-        if can_advance:
-            st.success(reason)
-            if st.button("Avanzar ronda", type="primary", use_container_width=True, key="board-advance-round"):
-                try:
-                    advance_round(conn)
-                    st.toast("Ronda avanzada")
-                    rerun()
-                except ValueError as exc:
-                    st.error(str(exc))
-        else:
-            st.info(reason)
-            st.button("Avanzar ronda", disabled=True, use_container_width=True, key="board-advance-round-disabled")
-
-        if state.current_round < max(1, state.bracket_size.bit_length() - 1):
-            render_drag_advancement(conn, names)
 
 
 def render_final_winner_team_preview(conn: sqlite3.Connection, names: dict[int, str], matches: list[Match]) -> None:
@@ -333,6 +313,47 @@ def match_for_position(grouped: dict[int, list[Match]], round_number: int, posit
     )
 
 
+def is_auto_bye_match(match: Match) -> bool:
+    players = match_players(match)
+    return (
+        match.status == MatchStatus.COMPLETE
+        and len(players) == 1
+        and match.winner_id == players[0]
+        and match.loser_id is None
+    )
+
+
+def projected_match_for_position(
+    grouped: dict[int, list[Match]],
+    round_number: int,
+    position: int,
+) -> Match:
+    match = match_for_position(grouped, round_number, position)
+    if match.id or round_number <= 1:
+        return match
+
+    previous_matches = [
+        match_for_position(grouped, round_number - 1, (position * 2) - 1),
+        match_for_position(grouped, round_number - 1, position * 2),
+    ]
+    projected_players = [
+        previous.winner_id if is_auto_bye_match(previous) else None
+        for previous in previous_matches
+    ]
+    return Match(
+        id=0,
+        round_number=round_number,
+        position=position,
+        player_a_id=projected_players[0],
+        player_b_id=projected_players[1],
+        winner_id=None,
+        loser_id=None,
+        status=MatchStatus.PENDING,
+        note="",
+        pledge_done=False,
+    )
+
+
 def render_bracket_match(match: Match, names: dict[int, str], bracket_size: int) -> str:
     status_class = "is-complete" if match.status == MatchStatus.COMPLETE else "is-pending"
     a_class = "winner-slot" if match.winner_id and match.winner_id == match.player_a_id else ""
@@ -364,7 +385,7 @@ def render_bracket_column(
     label = round_label(round_number, bracket_size)
     html = [f"<section class='march-column {side}'><h4>{escape(label)}</h4><div class='march-stack'>"]
     for position in positions:
-        html.append(render_bracket_match(match_for_position(grouped, round_number, position), names, bracket_size))
+        html.append(render_bracket_match(projected_match_for_position(grouped, round_number, position), names, bracket_size))
     html.append("</div></section>")
     return "".join(html)
 
@@ -374,26 +395,19 @@ def render_bracket(conn: sqlite3.Connection, names: dict[int, str]) -> None:
     grouped = matches_grouped_by_round(conn)
     total_rounds = max(1, state.bracket_size.bit_length() - 1)
     html = ["<div class='march-shell'><div class='march-board'>"]
-    for round_number in range(1, total_rounds):
+    for round_number in range(1, total_rounds + 1):
         match_count = max(1, state.bracket_size // (2**round_number))
-        left_positions = list(range(1, (match_count // 2) + 1))
-        html.append(render_bracket_column(grouped, names, state.bracket_size, round_number, left_positions, "left-side"))
-
-    html.append(
-        render_bracket_column(
-            grouped,
-            names,
-            state.bracket_size,
-            total_rounds,
-            [1],
-            "final-side",
-        )
-    )
-
-    for round_number in range(total_rounds - 1, 0, -1):
-        match_count = max(1, state.bracket_size // (2**round_number))
-        right_positions = list(range((match_count // 2) + 1, match_count + 1))
-        html.append(render_bracket_column(grouped, names, state.bracket_size, round_number, right_positions, "right-side"))
+        matches = [
+            projected_match_for_position(grouped, round_number, position)
+            for position in range(1, match_count + 1)
+        ]
+        visible_positions = [
+            match.position
+            for match in matches
+            if round_number > 1 or not is_auto_bye_match(match)
+        ]
+        side = "final-side" if round_number == total_rounds else "left-side"
+        html.append(render_bracket_column(grouped, names, state.bracket_size, round_number, visible_positions, side))
 
     html.append("</div></div>")
     st.markdown("".join(html), unsafe_allow_html=True)
