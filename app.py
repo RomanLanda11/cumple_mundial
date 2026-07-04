@@ -190,7 +190,7 @@ def current_round_view(conn: sqlite3.Connection) -> None:
     with tab_board:
         render_bracket(conn, names)
         render_final_winner_team_preview(conn, names, matches)
-        render_board_actions(conn, names, matches)
+        render_board_actions(conn, names, matches, can_advance, reason)
 
     with tab_control:
         k1, k2, k3, k4 = st.columns(4)
@@ -234,6 +234,8 @@ def render_board_actions(
     conn: sqlite3.Connection,
     names: dict[int, str],
     matches: list[Match],
+    can_advance: bool,
+    reason: str,
 ) -> None:
     st.markdown("### Acciones del cuadro")
     action_tabs = st.tabs(["Ganadores", "Bandos"])
@@ -254,6 +256,20 @@ def render_board_actions(
 
     with action_tabs[1]:
         representatives_panel(conn, names, "board")
+
+    st.markdown("### Avanzar")
+    if can_advance:
+        st.success(reason)
+        if st.button("Avanzar ronda", type="primary", use_container_width=True, key="board-advance-round"):
+            try:
+                advance_round(conn)
+                st.toast("Ronda avanzada")
+                rerun()
+            except ValueError as exc:
+                st.error(str(exc))
+    else:
+        st.info(reason)
+        st.button("Avanzar ronda", disabled=True, use_container_width=True, key="board-advance-round-disabled")
 
 
 def render_final_winner_team_preview(conn: sqlite3.Connection, names: dict[int, str], matches: list[Match]) -> None:
